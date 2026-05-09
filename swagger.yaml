@@ -1,0 +1,345 @@
+openapi: 3.0.0
+info:
+  title: MEDISTOCK API
+  description: |
+    API RESTful para el sistema MEDISTOCK - Plataforma de gestión de inventario
+    y comercio electrónico de productos médicos.
+    
+    ## Autenticación
+    La mayoría de endpoints requieren un JWT en el header:
+    `Authorization: Bearer <token>`
+    
+    Obtén el token con `POST /api/auth/login`
+    
+    ## Roles
+    - **1** = Admin
+    - **2** = Cliente  
+    - **3** = Ejecutivo
+    - **4** = Logística
+    - **5** = Finanzas
+  version: 1.0.0
+  contact:
+    name: Equipo MEDISTOCK
+
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor local (desarrollo)
+  - url: https://tu-backend.render.com/api
+    description: Servidor producción (Render)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Producto:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        descripcion: { type: string }
+        precio: { type: number }
+        stock: { type: integer }
+        categoria: { type: string }
+        activo: { type: boolean }
+
+    Pedido:
+      type: object
+      properties:
+        id_pedido: { type: integer }
+        id_cliente: { type: integer }
+        estado: { type: string, enum: [pendiente, en_proceso, completado, cancelado] }
+        total: { type: number }
+        metodo_pago: { type: string }
+        fecha: { type: string, format: date-time }
+        detalles:
+          type: array
+          items:
+            type: object
+            properties:
+              id_producto: { type: integer }
+              cantidad: { type: integer }
+              precio_unitario: { type: number }
+              subtotal: { type: number }
+
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+        timestamp: { type: string }
+
+paths:
+  /health:
+    get:
+      summary: Estado del servidor
+      tags: [Sistema]
+      responses:
+        '200':
+          description: Servidor operativo
+
+  /auth/login:
+    post:
+      summary: Iniciar sesión y obtener JWT
+      tags: [Autenticación]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, example: admin@medistock.cl }
+                password: { type: string, example: "123456" }
+      responses:
+        '200':
+          description: Login exitoso, retorna token JWT
+        '401':
+          description: Credenciales inválidas
+
+  /auth/me:
+    get:
+      summary: Obtener perfil del usuario autenticado
+      tags: [Autenticación]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Datos del usuario actual
+        '401':
+          description: No autenticado
+
+  /productos:
+    get:
+      summary: Listar todos los productos activos
+      tags: [Productos]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: categoria
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista paginada de productos
+    post:
+      summary: Crear nuevo producto
+      tags: [Productos]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, precio]
+              properties:
+                nombre: { type: string, example: Paracetamol 500mg }
+                descripcion: { type: string }
+                precio: { type: number, example: 990 }
+                stock: { type: integer, example: 100 }
+                categoria: { type: string, example: analgesicos }
+      responses:
+        '201':
+          description: Producto creado
+        '422':
+          description: Datos inválidos
+
+  /productos/{id}:
+    get:
+      summary: Obtener producto por ID
+      tags: [Productos]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Datos del producto
+        '404':
+          description: Producto no encontrado
+    patch:
+      summary: Actualizar producto
+      tags: [Productos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre: { type: string }
+                precio: { type: number }
+                stock: { type: integer }
+                categoria: { type: string }
+      responses:
+        '200':
+          description: Producto actualizado
+    delete:
+      summary: Desactivar producto (borrado lógico)
+      tags: [Productos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Producto desactivado
+
+  /pedidos:
+    get:
+      summary: Listar pedidos
+      tags: [Pedidos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: estado
+          schema: { type: string, enum: [pendiente, en_proceso, completado, cancelado] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+      responses:
+        '200':
+          description: Lista paginada de pedidos
+    post:
+      summary: Crear nuevo pedido
+      tags: [Pedidos]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_cliente, detalles]
+              properties:
+                id_cliente: { type: integer }
+                metodo_pago: { type: string, example: webpay }
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    required: [id_producto, cantidad, precio_unitario]
+                    properties:
+                      id_producto: { type: integer }
+                      cantidad: { type: integer }
+                      precio_unitario: { type: number }
+      responses:
+        '201':
+          description: Pedido creado y stock descontado
+        '409':
+          description: Stock insuficiente
+
+  /pedidos/cliente/{id_cliente}:
+    get:
+      summary: Pedidos de un cliente específico
+      tags: [Pedidos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id_cliente
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista de pedidos del cliente
+
+  /pedidos/{id}:
+    get:
+      summary: Obtener pedido por ID
+      tags: [Pedidos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Datos del pedido con detalles
+        '404':
+          description: Pedido no encontrado
+
+  /pedidos/{id}/estado:
+    patch:
+      summary: Actualizar estado del pedido
+      tags: [Pedidos]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [pendiente, en_proceso, completado, cancelado] }
+      responses:
+        '200':
+          description: Estado actualizado
+
+  /inventario:
+    get:
+      summary: Listar inventario completo
+      tags: [Inventario]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Stock de todos los productos
+
+  /inventario/{id_producto}:
+    get:
+      summary: Stock de un producto específico
+      tags: [Inventario]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id_producto
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Datos de stock del producto
+
+  /inventario/{id_producto}/stock:
+    patch:
+      summary: Actualizar stock de un producto
+      tags: [Inventario]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id_producto
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cantidad]
+              properties:
+                cantidad: { type: integer, example: 150 }
+      responses:
+        '200':
+          description: Stock actualizado
