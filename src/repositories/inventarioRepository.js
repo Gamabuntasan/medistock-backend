@@ -1,83 +1,75 @@
 // =============================================================
-// COMPONENTE 3: Repository / DAO - Inventario & Usuarios
+// COMPONENTE 3: Repository / DAO - Productos
+// Toda la lógica de acceso a la BD está aquí.
+// Los servicios NO hablan directamente con Supabase,
+// solo llaman a métodos de este repositorio.
 // =============================================================
 
 const supabase = require('../config/supabase');
 
-// ---- INVENTARIO ----
-const InventarioRepository = {
+const ProductoRepository = {
 
-  async findAll() {
-    const { data, error } = await supabase
-      .from('inventario_detalle')
-      .select('*, productos(nombre, categoria)');
+  async findAll({ page = 1, limit = 20, categoria } = {}) {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('productos')
+      .select('*', { count: 'exact' })
+      .eq('activo', true)
+      .range(from, to);
+
+    if (categoria) {
+      query = query.eq('categoria', categoria);
+    }
+
+    const { data, error, count } = await query;
     if (error) throw error;
-    return data;
-  },
-
-  async findByProducto(id_producto) {
-    const { data, error } = await supabase
-      .from('inventario_detalle')
-      .select('*, productos(nombre)')
-      .eq('id_producto', id_producto)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async descontarStock(id_producto, cantidad) {
-    // Usa la función RPC que ya tienes definida en Supabase
-    const { error } = await supabase.rpc('descontar_stock', {
-      p_producto_id: id_producto,
-      p_cantidad: cantidad
-    });
-    if (error) throw error;
-    return true;
-  },
-
-  async updateStock(id_producto, nueva_cantidad) {
-    const { data, error } = await supabase
-      .from('inventario_detalle')
-      .update({ cantidad_disponible: nueva_cantidad })
-      .eq('id_producto', id_producto)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  }
-};
-
-// ---- USUARIOS ----
-// ---- USUARIOS (fix RD-NEW1) ----
-const UsuarioRepository = {
-
-  async findAll() {
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select('id:id_usuario, nombre, email, rol_id, activo, created_at');
-    if (error) throw error;
-    return data;
+    return { data, count };
   },
 
   async findById(id) {
     const { data, error } = await supabase
-      .from('usuarios')
-      .select('id:id_usuario, nombre, email, rol_id, activo, created_at')
-      .eq('id_usuario', id)
+      .from('productos')
+      .select('id:id_producto, nombre, descripcion, precio, stock, categoria, activo')
+      .eq('id_producto', id)
       .single();
     if (error) throw error;
     return data;
   },
 
-  async findByAuthId(auth_id) {
+  async create(producto) {
     const { data, error } = await supabase
-      .from('usuarios')
-      .select('id:id_usuario, nombre, email, rol_id, activo')
-      .eq('auth_id', auth_id)
+      .from('productos')
+      .insert(producto)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, campos) {
+    const { data, error } = await supabase
+      .from('productos')
+      .update(campos)
+      .eq('id_producto', id)
+      .select('id:id_producto, nombre, descripcion, precio, stock, categoria, activo')
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    // Borrado lógico: no eliminamos el registro, solo lo desactivamos
+    const { data, error } = await supabase
+      .from('productos')
+      .update({ activo: false })
+      .eq('id_producto', id)
+      .select('id:id_producto, nombre, descripcion, precio, stock, categoria, activo')
       .single();
     if (error) throw error;
     return data;
   }
 };
 
-module.exports = { InventarioRepository, UsuarioRepository };
+module.exports = ProductoRepository;
