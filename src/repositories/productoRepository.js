@@ -28,16 +28,15 @@ const ProductoRepository = {
     return { data, count };
   },
 
-  async findById(id) {
-    const { data, error } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
+ async findById(id) {
+  const { data, error } = await supabase
+    .from('productos')
+    .select('id:id_producto, nombre, descripcion, precio, stock, categoria, activo')
+    .eq('id_producto', id)
+    .single();
+  if (error) throw error;
+  return data;
+}, 
   async create(producto) {
     const { data, error } = await supabase
       .from('productos')
