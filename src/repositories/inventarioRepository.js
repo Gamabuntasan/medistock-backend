@@ -48,12 +48,13 @@ const InventarioRepository = {
 };
 
 // ---- USUARIOS ----
+// ---- USUARIOS (fix RD-NEW1) ----
 const UsuarioRepository = {
 
   async findAll() {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, rol_id, activo, created_at');
+      .select('id:id_usuario, nombre, email, rol_id, activo, created_at');
     if (error) throw error;
     return data;
   },
@@ -61,8 +62,8 @@ const UsuarioRepository = {
   async findById(id) {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, rol_id, activo, created_at')
-      .eq('id', id)
+      .select('id:id_usuario, nombre, email, rol_id, activo, created_at')
+      .eq('id_usuario', id)
       .single();
     if (error) throw error;
     return data;
@@ -71,7 +72,7 @@ const UsuarioRepository = {
   async findByAuthId(auth_id) {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, rol_id, activo')
+      .select('id:id_usuario, nombre, email, rol_id, activo')
       .eq('auth_id', auth_id)
       .single();
     if (error) throw error;
